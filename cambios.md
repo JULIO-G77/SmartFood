@@ -313,3 +313,95 @@ El panel siempre mostraba `Confirmados: 0`, `Cancelados: 0` y `Sin responder: N`
 
 **Para qué sirve:**
 La página se veía genérica con el ícono de hoja de Tabler Icons. Ahora muestra el logo real del proyecto, dando identidad visual.
+
+---
+
+## [09/08/2026]
+
+### 17. Reubicación de la base de datos en producción (Railway → TiDB Cloud)
+
+**Problema inicial:**
+La base de datos de producción estaba alojada en **Railway** (`reseau.proxy.rlwy.net:44860`). El plan trial de la cuenta expiró y Railway puso los dos servicios MySQL (`skillful-rejoicing` y `optimistic-healing`) en estado **"service is offline"**. Al estar la DB caída, el backend de Render arrancaba, fallaba `sequelize.authenticate()` en `server.js` y la instancia terminaba con **"Exited with status 1"** (deploy fallido). La URL pública quedaba caída.
+
+---
+
+### 18. Intentos de migración a otras bases de datos
+
+#### Intento 1 — FreeSQLDatabase (NO funcionó en producción)
+
+**Qué se hizo:**
+- Se creó una cuenta y una base de datos gratuita en **freesqldatabase.com**:
+  - Host: `sql10.freesqldatabase.com`
+  - Puerto: `3306`
+  - Base de datos y usuario: `sql10834982`
+  - Contraseña: `9fNQ7KDHQT`
+- Desde el equipo local la conexión funcionaba correctamente (MySQL 5.5.62).
+- Se ejecutó el seed (`backend/seed.js`) y se crearon las 5 tablas con los 12 usuarios de prueba.
+
+**Problema encontrado:**
+El deploy de Render **compilaba bien** (build exitoso), pero al arrancar fallaba con `connect ETIMEDOUT`: el host se resolvía pero el datacenter de Render **no podía alcanzar el servidor de FreeSQLDatabase**. Es un problema conocido: FreeSQLDatabase solo permite conexiones desde su phpMyAdmin o desde IPs domésticas, y **bloquea el tráfico proveniente de proveedores cloud** (como Render). Por eso desde la PC local conectaba pero desde Render no. Se descartó esta opción.
+
+#### Intento 2 — TiDB Cloud Starter (SOLUCIÓN FINAL ✅)
+
+**Qué se hizo:**
+- Se creó una cuenta gratuita en **tidbcloud.com** y un cluster **Starter** (plan gratis, sin tarjeta de crédito, 5 GiB de almacenamiento + 50M de Request Units por mes).
+- Configuración del cluster:
+  - Nombre: `smartfood`
+  - Proveedor: AWS
+  - Región: Sao Paulo (sa-east-1)
+  - Spending limit: `$0` (solo cuota gratuita)
+- Credenciales de conexión:
+  - Host: `gateway01.sa-east-1.prod.aws.tidbcloud.com`
+  - Puerto: `4000`
+  - Usuario: `8bzGDKSaNXvsEds.root`
+  - Contraseña: `nGBPy2pVBaCx8JOV`
+  - Base de datos: `smartfood` (creada con `CREATE DATABASE IF NOT EXISTS smartfood`)
+  - **SSL obligatorio**: TiDB exige conexiones cifradas (TLS).
+- Se ejecutó el seed contra TiDB y se verificaron los datos: 5 tablas, 12 usuarios (2 admin + 10 estudiantes), 5 menús semanales.
+
+**Para qué sirve:**
+TiDB Cloud Starter es un servicio **MySQL-compatible, serverless y gratuito** que sí acepta conexiones desde los servidores de Render (combinación documentada y usada ampliamente). Al ser compatible con el dialecto MySQL que usa Sequelize, el código del proyecto no requirió ningún cambio: solo se actualizaron las variables de entorno de Render.
+
+---
+
+### 19. Cambios aplicados
+
+**Variables de entorno en Render (pestaña Environment del servicio SmartFood):**
+
+Se reemplazaron los valores antiguos (de Railway y después de FreeSQLDatabase) por:
+
+| Variable | Valor |
+|---|---|
+| `DB_HOST` | `gateway01.sa-east-1.prod.aws.tidbcloud.com` |
+| `DB_PORT` | `4000` |
+| `DB_NAME` | `smartfood` |
+| `DB_USER` | `8bzGDKSaNXvsEds.root` |
+| `DB_PASSWORD` | `nGBPy2pVBaCx8JOV` |
+| `DB_SSL` | `true` |
+
+**Notas importantes:**
+- `DB_SSL=true` es obligatorio con TiDB (conexión cifrada TLS).
+- `JWT_SECRET`, `JWT_EXPIRES` y `PORT` se dejaron sin cambios.
+
+**Resultado final:**
+El deploy quedó **live**. Los logs confirman:
+```
+✅ Conectado a MySQL
+🚀 SmartFood corriendo en http://localhost:3000
+==> Your service is live 🎉
+==> Available at your primary URL https://smartfood-jau7.onrender.com
+```
+
+Pruebas realizadas en producción:
+- `GET https://smartfood-jau7.onrender.com/` → 200 OK
+- `GET /api/salud` → `{"estado":"OK","sistema":"SmartFood","version":"1.0.0"}`
+- Login del admin (`admin@smartfood.co` / `admin123`) → 200 OK con token JWT válido
+
+**Credenciales vigentes:**
+- Admin: `admin@smartfood.co` / `admin123`
+- Coordinador: `coordinador@smartfood.co` / `coord123`
+- Estudiantes: `estudiante1@smartfood.co` a `estudiante10@smartfood.co` / `est123`
+
+**Recordatorio:**
+- Render free tier se duerme tras 15 minutos de inactividad; la primera carga puede tardar 30–60 segundos.
+- TiDB Starter free tiene un límite de 5 GiB de almacenamiento y 50M de Request Units por mes; si se alcanza, la instancia se estrangula hasta el siguiente mes.
