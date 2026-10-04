@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -22,6 +24,27 @@
     "sequelize": "^6.33.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "jest": "^30.5.2",
+    "nodemon": "^3.0.1",
+    "supertest": "^7.3.1"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/tests/helpers/setup.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/tests/helpers/",
+      "modelos.mock.js"
+    ],
+    "collectCoverageFrom": [
+      "routes/**/*.js",
+      "middleware/**/*.js"
+    ],
+    "coverageReporters": [
+      "text",
+      "text-summary"
+    ]
   }
 }
