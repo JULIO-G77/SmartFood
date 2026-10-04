@@ -1,0 +1,12 @@
+digraph G {
+  rankdir=LR; fontname="Helvetica"; node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10]; edge [fontname="Helvetica", fontsize=9, color="#374151"];
+  login [label="Inicio de sesión", fillcolor="#fde68a"];
+  subgraph cluster_e { label="Rol estudiante (goSub)"; style=rounded; color="#1e90ff"; node [fillcolor="#dbeafe"];
+    e_dash [label="Dashboard\n(menú hoy / mañana)"]; e_menu [label="Menú de la semana"]; e_conf [label="Confirmar asistencia"]; e_hist [label="Historial"]; e_not [label="Notificaciones"]; e_perfil [label="Mi perfil\n(editar, cambiar clave)"]; }
+  subgraph cluster_a { label="Rol administrador (goAdmin)"; style=rounded; color="#15803d"; node [fillcolor="#dcfce7"];
+    a_panel [label="Panel / estadísticas"]; a_menus [label="Gestión de menús"]; a_conf [label="Confirmaciones"]; a_usu [label="Gestión de usuarios"]; a_rep [label="Reportes"]; a_not [label="Notificaciones masivas"]; }
+  login -> e_dash [label="rol = estudiante"]; login -> a_panel [label="rol = admin"];
+  e_dash -> e_menu; e_dash -> e_conf; e_dash -> e_hist; e_dash -> e_not; e_dash -> e_perfil;
+  a_panel -> a_menus; a_panel -> a_conf; a_panel -> a_usu; a_panel -> a_rep; a_panel -> a_not;
+  e_dash -> login [label="Salir", style=dashed]; a_panel -> login [label="Salir", style=dashed];
+}

@@ -1,0 +1,13 @@
+digraph G {
+  rankdir=TB; fontname="Helvetica"; node [shape=record, fontname="Helvetica", fontsize=10, style=filled, fillcolor="#eaf7ee", color="#15803d"]; edge [fontname="Helvetica", fontsize=9, color="#374151"];
+  Usuario [label="{Usuario|+ id_usuario : INT (PK)\l+ nombre : STRING(120)\l+ correo : STRING(120) [único]\l+ password : STRING(255) [hash bcrypt]\l+ rol : ENUM(admin, estudiante)\l+ activo : TINYINT\l+ fecha_registro : DATETIME\l|}"];
+  Estudiante [label="{Estudiante|+ id_estudiante : INT (PK)\l+ id_usuario : INT (FK, único)\l+ curso : STRING(20)\l+ ciudad : STRING(80)\l+ alergias : TEXT\l+ preferencias : ENUM\l|}"];
+  Menu [label="{Menu|+ id_menu : INT (PK)\l+ fecha : DATE [único]\l+ entrada : STRING(150)\l+ plato_principal : STRING(150)\l+ bebida : STRING(100)\l+ postre : STRING(100)\l+ activo : TINYINT\l+ creado_por : INT (FK)\l|}"];
+  Confirmacion [label="{Confirmacion|+ id_confirmacion : INT (PK)\l+ id_estudiante : INT (FK)\l+ id_menu : INT (FK)\l+ estado : ENUM(confirmado, cancelado)\l+ fecha_confirmacion : DATETIME\l|[único: id_estudiante + id_menu]\l}"];
+  Notificacion [label="{Notificacion|+ id_notificacion : INT (PK)\l+ id_usuario : INT (FK)\l+ titulo : STRING(120)\l+ mensaje : TEXT\l+ tipo : ENUM\l+ leida : TINYINT\l+ fecha : DATETIME\l|}"];
+  Usuario -> Estudiante [label="1 — 0..1  (hasOne 'perfil')", arrowhead=none];
+  Usuario -> Notificacion [label="1 — 0..*  (hasMany)", arrowhead=none];
+  Usuario -> Menu [label="1 — 0..*  (creado_por)", arrowhead=none, style=dashed];
+  Estudiante -> Confirmacion [label="1 — 0..*  (hasMany)", arrowhead=none];
+  Menu -> Confirmacion [label="1 — 0..*  (hasMany)", arrowhead=none];
+}

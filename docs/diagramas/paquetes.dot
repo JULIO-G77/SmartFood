@@ -1,0 +1,18 @@
+digraph G {
+  rankdir=TB; compound=true; fontname="Helvetica"; node [shape=tab, fontname="Helvetica", fontsize=10, style=filled, fillcolor="#eaf7ee", color="#15803d"]; edge [style=dashed, color="#374151", arrowhead=vee];
+  subgraph cluster_front { label="frontend/"; style=rounded; color="#1e90ff"; fontname="Helvetica-Bold";
+    f_html [label="index.html (SPA)"]; f_css [label="css/styles.css"];
+    f_api [label="js/api.js"]; f_utils [label="js/utils.js"]; f_app [label="js/app.js"]; f_est [label="js/estudiante.js"]; f_adm [label="js/admin.js"]; }
+  subgraph cluster_back { label="backend/"; style=rounded; color="#15803d"; fontname="Helvetica-Bold";
+    server [label="server.js"]; cron [label="cron.js"]; seed [label="seed.js"];
+    routes [label="routes/\nauth · menu · confirmacion\nusuarios · notificaciones · reportes"];
+    mw [label="middleware/\nauth.js (JWT + roles)"];
+    models [label="models/\nUsuario · Estudiante · Menu\nConfirmacion · Notificacion · index"];
+    cfg [label="config/database.js"]; tests [label="tests/\n(Jest + Supertest)", fillcolor="#fef9c3", color="#a16207"]; }
+  subgraph cluster_db { label="database/"; style=rounded; color="#7c3aed"; fontname="Helvetica-Bold"; sql [label="smartfood.sql", fillcolor="#ede9fe", color="#7c3aed"]; }
+  docs [label="docs/\nINSTALACION · INFORME_ESTANDARES", fillcolor="#f3f4f6", color="#6b7280"];
+  f_html -> f_app; f_app -> f_api; f_app -> f_utils; f_est -> f_api; f_adm -> f_api; f_html -> f_css;
+  f_api -> server [label="HTTP /api (JSON)", lhead=cluster_back, ltail=cluster_front];
+  server -> routes; server -> cron; server -> cfg; routes -> mw; routes -> models; cron -> models; seed -> models; models -> cfg; tests -> routes;
+  cfg -> sql [label="MySQL", lhead=cluster_db];
+}

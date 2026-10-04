@@ -1,0 +1,101 @@
+PASS tests/usuarios.test.js
+  Módulo Usuarios
+    ✓ GET /api/usuarios: un estudiante no puede listar (403) (37 ms)
+    ✓ GET /api/usuarios: el listado excluye el campo password (9 ms)
+    ✓ POST /api/usuarios: exige nombre, correo y contraseña (15 ms)
+    ✓ POST /api/usuarios: rechaza correo repetido (5 ms)
+    ✓ POST /api/usuarios: guarda la contraseña como hash bcrypt, nunca en claro (158 ms)
+    ✓ POST /api/usuarios: un admin nuevo no genera perfil de estudiante (82 ms)
+    ✓ PUT /cambiar-password: rechaza contraseñas de menos de 6 caracteres (7 ms)
+    ✓ PUT /cambiar-password: rechaza contraseña actual incorrecta (162 ms)
+    ✓ PUT /cambiar-password: actualiza con un hash nuevo (329 ms)
+    ✓ DELETE /api/usuarios/:id: el admin no puede eliminarse a sí mismo (5 ms)
+    ✓ DELETE /api/usuarios/:id: 404 si el usuario no existe (4 ms)
+  Módulo Notificaciones
+    ✓ GET /no-leidas devuelve el conteo del usuario autenticado (3 ms)
+    ✓ PUT /marcar-leidas actualiza solo las del usuario (10 ms)
+    ✓ POST /masiva: un estudiante no puede enviar (403) (3 ms)
+    ✓ POST /masiva: el admin envía a todos los estudiantes activos (8 ms)
+
+PASS tests/reportes.test.js
+  Módulo Reportes
+    ✓ GET /estadisticas: un estudiante recibe 403 (6 ms)
+    ✓ GET /estadisticas: calcula porcentaje de asistencia y pendientes (4 ms)
+    ✓ GET /estadisticas: sin estudiantes no divide por cero (4 ms)
+    ✓ GET /semanal devuelve el resumen de la semana (admin) (3 ms)
+    ✓ GET /semanal: error de BD devuelve 500 (7 ms)
+
+PASS tests/auth.test.js
+  Módulo Autenticación — POST /api/auth/login
+    ✓ rechaza correo con formato inválido (400) (34 ms)
+    ✓ rechaza contraseña vacía (400) (3 ms)
+    ✓ usuario inexistente devuelve 401 (3 ms)
+    ✓ contraseña incorrecta devuelve 401 (166 ms)
+    ✓ credenciales válidas devuelven JWT con rol e id (155 ms)
+    ✓ error interno de BD devuelve 500 (4 ms)
+
+PASS tests/confirmacion.test.js
+  Módulo Confirmación de asistencia
+    ✓ POST /api/confirmacion: un admin no puede confirmar (400) (57 ms)
+    ✓ POST /api/confirmacion: menú inexistente devuelve 404 (22 ms)
+    ✓ POST /api/confirmacion: crea la confirmación y notifica (14 ms)
+    ✓ POST /api/confirmacion: si ya existía cancelada, la reactiva (41 ms)
+    ✓ DELETE /api/confirmacion/:id_menu cancela la asistencia (19 ms)
+    ✓ DELETE /api/confirmacion/:id_menu devuelve 404 si no hay confirmación (3 ms)
+    ✓ GET /mi-estado devuelve "pendiente" cuando no hay registro (3 ms)
+    ✓ GET /conteo calcula pendientes = total - confirmados - cancelados (4 ms)
+    ✓ GET /todas: un estudiante recibe 403 (3 ms)
+    ✓ GET /todas: el admin recibe lista vacía si no hay menú de mañana (4 ms)
+    ✓ GET /todas: usa la fecha de mañana por defecto (3 ms)
+
+PASS tests/menu.test.js
+  Módulo Menú
+    ✓ GET /api/menu exige autenticación (401) (9 ms)
+    ✓ GET /api/menu devuelve el menú de mañana (4 ms)
+    ✓ GET /api/menu responde 404 si no hay menú (3 ms)
+    ✓ GET /api/menu/hoy responde 404 si no hay menú de hoy (5 ms)
+    ✓ GET /api/menu/semana devuelve la lista de menús (8 ms)
+    ✓ POST /api/menu: un estudiante no puede crear menús (403) (8 ms)
+    ✓ POST /api/menu: campos incompletos devuelven 400 (3 ms)
+    ✓ POST /api/menu: rechaza fechas de hoy o pasadas (3 ms)
+    ✓ POST /api/menu: rechaza fecha duplicada (3 ms)
+    ✓ POST /api/menu: el admin crea un menú válido (201) (3 ms)
+    ✓ PUT /api/menu/:id responde 404 si el menú no existe (3 ms)
+    ✓ DELETE /api/menu/:id elimina el menú (admin) (7 ms)
+
+PASS tests/middleware.test.js
+  Seguridad — middleware JWT y roles
+    ✓ verificarToken sin token responde 401 (1 ms)
+    ✓ verificarToken con token falso responde 403
+    ✓ verificarToken con token expirado responde 403 (1 ms)
+    ✓ verificarToken válido llena req.usuario y llama next()
+    ✓ soloAdmin bloquea a un estudiante (403) (1 ms)
+    ✓ soloAdmin deja pasar a un admin
+    ✓ soloEstudiante bloquea a un admin (403) (1 ms)
+
+--------------------|---------|----------|---------|---------|----------------------------------
+File                | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                
+--------------------|---------|----------|---------|---------|----------------------------------
+All files           |   78.73 |    78.57 |   80.64 |   77.69 |                                  
+ middleware         |   95.23 |     87.5 |     100 |      95 |                                  
+  auth.js           |   95.23 |     87.5 |     100 |      95 | 26                               
+ routes             |   77.55 |    77.77 |   78.57 |   76.35 |                                  
+  auth.js           |     100 |      100 |     100 |     100 |                                  
+  confirmacion.js   |   84.12 |    85.71 |   83.33 |   82.45 | 22,34,43,48-57,67,86             
+  menu.js           |      80 |    84.21 |   85.71 |   77.96 | 12-13,24,35,40-43,58,66-68,78    
+  notificaciones.js |   73.33 |       75 |      80 |   72.41 | 7-14,22,30,39,46                 
+  reportes.js       |   96.87 |      100 |     100 |   96.42 | 34                               
+  usuarios.js       |   57.14 |    65.85 |   57.14 |   56.06 | 15,20-26,31-40,54,68,73-83,92-94 
+--------------------|---------|----------|---------|---------|----------------------------------
+
+=============================== Coverage summary ===============================
+Statements   : 78.73% ( 248/315 )
+Branches     : 78.57% ( 77/98 )
+Functions    : 80.64% ( 25/31 )
+Lines        : 77.69% ( 216/278 )
+================================================================================
+Test Suites: 6 passed, 6 total
+Tests:       56 passed, 56 total
+Snapshots:   0 total
+Time:        2.943 s, estimated 3 s
+Ran all test suites.

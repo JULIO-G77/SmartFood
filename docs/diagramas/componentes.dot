@@ -1,0 +1,13 @@
+digraph G {
+  rankdir=TB; nodesep=0.4; fontname="Helvetica"; node [shape=component, fontname="Helvetica", fontsize=10, style=filled]; edge [fontname="Helvetica", fontsize=9, color="#374151"];
+  subgraph cluster_cli { label="Capa de presentación (navegador)"; style=rounded; color="#1e90ff"; node [fillcolor="#dbeafe"];
+    ui [label="Interfaz SPA\n(HTML + CSS)"]; ctl [label="Controladores JS\napp · estudiante · admin"]; api [label="Cliente API\napi.js (fetch + JWT)"]; }
+  subgraph cluster_srv { label="Capa de lógica de negocio (Node.js + Express)"; style=rounded; color="#15803d"; node [fillcolor="#dcfce7"];
+    rest [label="API REST\nroutes/*"]; sec [label="Seguridad\nJWT · roles · express-validator\nbcryptjs · CORS"]; job [label="Tareas programadas\nnode-cron"]; mail [label="Correo\nnodemailer"]; log [label="Registro\nmorgan → access.log"]; }
+  subgraph cluster_dat { label="Capa de acceso a datos"; style=rounded; color="#7c3aed"; node [fillcolor="#ede9fe"];
+    orm [label="ORM Sequelize\nmodels/*"]; drv [label="Driver mysql2\n(pool de conexiones)"]; }
+  db [label="MySQL 8\nBD: smartfood", shape=cylinder, fillcolor="#fde68a"];
+  host [label="Render\n(despliegue web)", shape=box3d, fillcolor="#f3f4f6"];
+  ui -> ctl; ctl -> api; api -> rest [label="HTTPS / JSON"]; rest -> sec; rest -> orm; job -> orm; rest -> log; job -> mail [style=dashed]; orm -> drv; drv -> db;
+  host -> rest [style=dotted, label="aloja", arrowhead=none];
+}
