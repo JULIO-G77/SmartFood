@@ -1,0 +1,50 @@
+### Ejemplos para probar la API en VS Code
+### Instala la extensión "REST Client" (humao.rest-client) y pulsa "Send Request" sobre cada bloque.
+### Cambia la variable @host si pruebas en producción: https://smartfood-jau7.onrender.com
+
+@host = http://localhost:3000
+
+### 1. Estado del servicio
+GET {{host}}/api/salud
+
+### 2. Iniciar sesión como administrador (copia el token de la respuesta en @token)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "correo": "admin@smartfood.co", "password": "admin123" }
+
+###
+@token = PEGA_AQUI_EL_TOKEN
+
+### 3. Menú de mañana
+GET {{host}}/api/menu
+Authorization: Bearer {{token}}
+
+### 4. Crear un menú (admin) — usa una fecha futura
+POST {{host}}/api/menu
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "fecha": "2026-12-01", "entrada": "Sopa de verduras", "plato_principal": "Pollo al horno con arroz", "bebida": "Jugo de mora", "postre": "Fruta natural" }
+
+### 5. Listar usuarios (admin)
+GET {{host}}/api/usuarios
+Authorization: Bearer {{token}}
+
+### 6. Confirmar asistencia (con token de un estudiante)
+POST {{host}}/api/confirmacion
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "id_menu": 1 }
+
+### 7. Estadísticas (admin)
+GET {{host}}/api/reportes/estadisticas
+Authorization: Bearer {{token}}
+
+### 8. Notificación masiva (admin)
+POST {{host}}/api/notificaciones/masiva
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "titulo": "Aviso", "mensaje": "Mañana el almuerzo es a las 12:30.", "destinatarios": "estudiantes" }

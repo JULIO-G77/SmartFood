@@ -1,0 +1,2038 @@
+openapi: 3.0.3
+info:
+  title: SmartFood API
+  version: 1.0.0
+  description: 'API REST del sistema **SmartFood**, que permite a los estudiantes de la I.E. Normal Superior Montes
+    de María confirmar con anticipación su asistencia al comedor escolar, y al administrador gestionar menús, usuarios,
+    notificaciones y reportes.
+
+
+    **Formato:** todas las peticiones y respuestas usan JSON (`Content-Type: application/json`).
+
+
+    **Autenticación:** primero se llama a `POST /api/auth/login`; el token JWT recibido se envía en cada petición
+    protegida con el encabezado `Authorization: Bearer <token>`. El token vence según `JWT_EXPIRES` (7 días por
+    defecto).
+
+
+    **Roles:** `estudiante` y `admin`. Cada servicio indica qué rol puede usarlo.
+
+
+    **Errores:** las respuestas de error tienen la forma `{ "error": "mensaje" }`. Códigos usados: 400 (datos inválidos),
+    401 (falta token), 403 (token inválido o rol sin permiso), 404 (no encontrado) y 500 (error del servidor).'
+  contact:
+    name: Julio Génes Beltrán
+    url: https://github.com/JULIO-G77/SmartFood
+servers:
+- url: /
+  description: Servidor actual (el mismo desde el que se abre esta documentación)
+- url: https://smartfood-jau7.onrender.com
+  description: Producción (Render)
+- url: http://localhost:3000
+  description: Desarrollo local
+tags:
+- name: Sistema
+  description: Estado del servicio
+- name: Autenticación
+  description: Inicio de sesión y emisión del token JWT
+- name: Menú
+  description: Consulta y administración de menús diarios
+- name: Confirmación
+  description: Confirmación o cancelación de asistencia al comedor
+- name: Usuarios
+  description: Perfil propio y administración de usuarios
+- name: Notificaciones
+  description: Avisos individuales y masivos
+- name: Reportes
+  description: Estadísticas para el administrador
+paths:
+  /api/salud:
+    get:
+      tags:
+      - Sistema
+      summary: Estado del servicio
+      description: Verifica que el servidor esté en línea. No requiere autenticación.
+      x-rol: público
+      responses:
+        '200':
+          description: Servicio activo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estado:
+                    type: string
+                  sistema:
+                    type: string
+                  version:
+                    type: string
+              example:
+                estado: OK
+                sistema: SmartFood
+                version: 1.0.0
+  /api/auth/login:
+    post:
+      tags:
+      - Autenticación
+      summary: Iniciar sesión
+      description: 'Valida correo y contraseña y devuelve un token JWT que debe enviarse en el encabezado `Authorization:
+        Bearer <token>` de los demás servicios. Solo inicia sesión con usuarios activos.'
+      x-rol: público
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - correo
+              - password
+              properties:
+                correo:
+                  type: string
+                  format: email
+                password:
+                  type: string
+            example:
+              correo: estudiante1@smartfood.co
+              password: est123
+      responses:
+        '200':
+          description: Inicio de sesión correcto.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  usuario:
+                    $ref: '#/components/schemas/UsuarioSesion'
+              example:
+                token: eyJhbGciOiJIUzI1NiIs...
+                usuario:
+                  id: 2
+                  nombre: Sofía Martínez
+                  correo: estudiante1@smartfood.co
+                  rol: estudiante
+                  perfil:
+                    id_estudiante: 1
+                    curso: 11°A
+        '400':
+          description: Datos de entrada inválidos (correo con mal formato o contraseña vacía).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorValidacion'
+              example:
+                errors:
+                - type: field
+                  msg: Correo inválido
+                  path: correo
+                  location: body
+        '401':
+          description: Correo no registrado, usuario inactivo o contraseña incorrecta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Credenciales incorrectas
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+  /api/menu/hoy:
+    get:
+      tags:
+      - Menú
+      summary: Menú de hoy
+      description: Devuelve el menú activo de la fecha actual (solo lectura).
+      x-rol: estudiante o admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Menú de hoy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Menu'
+              example:
+                id_menu: 7
+                fecha: '2026-10-13'
+                entrada: Ensalada de aguacate
+                plato_principal: Lentejas con arroz integral
+                bebida: Jugo de mora
+                postre: Fruta natural
+                activo: 1
+                creado_por: 1
+        '404':
+          description: No hay menú para hoy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: No hay menú para hoy
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/menu:
+    get:
+      tags:
+      - Menú
+      summary: Menú de mañana
+      description: Devuelve el menú activo del día siguiente, que es el que el estudiante confirma.
+      x-rol: estudiante o admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Menú de mañana.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Menu'
+              example:
+                id_menu: 7
+                fecha: '2026-10-13'
+                entrada: Ensalada de aguacate
+                plato_principal: Lentejas con arroz integral
+                bebida: Jugo de mora
+                postre: Fruta natural
+                activo: 1
+                creado_por: 1
+        '404':
+          description: No hay menú publicado para mañana.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: No hay menú disponible para mañana
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+    post:
+      tags:
+      - Menú
+      summary: Crear menú
+      description: Crea el menú de un día futuro. La fecha debe ser mañana o posterior y no puede repetirse.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - fecha
+              - entrada
+              - plato_principal
+              - bebida
+              - postre
+              properties:
+                fecha:
+                  type: string
+                  format: date
+                  description: 'Fecha del menú (AAAA-MM-DD). Mínimo: mañana.'
+                entrada:
+                  type: string
+                  maxLength: 150
+                plato_principal:
+                  type: string
+                  maxLength: 150
+                bebida:
+                  type: string
+                  maxLength: 100
+                postre:
+                  type: string
+                  maxLength: 100
+            example:
+              fecha: '2026-10-13'
+              entrada: Ensalada de aguacate
+              plato_principal: Lentejas con arroz integral
+              bebida: Jugo de mora
+              postre: Fruta natural
+      responses:
+        '201':
+          description: Menú creado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Menu'
+              example:
+                id_menu: 7
+                fecha: '2026-10-13'
+                entrada: Ensalada de aguacate
+                plato_principal: Lentejas con arroz integral
+                bebida: Jugo de mora
+                postre: Fruta natural
+                activo: 1
+                creado_por: 1
+        '400':
+          description: Faltan campos, la fecha es de hoy o del pasado, o ya existe un menú para esa fecha.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Ya existe un menú para esa fecha
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+  /api/menu/semana:
+    get:
+      tags:
+      - Menú
+      summary: Menú de la semana
+      description: Lista los menús activos de lunes a viernes de la semana actual, ordenados por fecha.
+      x-rol: estudiante o admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de menús (puede estar vacía).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Menu'
+              example:
+              - id_menu: 7
+                fecha: '2026-10-13'
+                entrada: Ensalada de aguacate
+                plato_principal: Lentejas con arroz integral
+                bebida: Jugo de mora
+                postre: Fruta natural
+                activo: 1
+                creado_por: 1
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/menu/todos:
+    get:
+      tags:
+      - Menú
+      summary: Listar todos los menús
+      description: Devuelve todos los menús registrados, del más reciente al más antiguo.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Lista completa de menús.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Menu'
+              example:
+              - id_menu: 7
+                fecha: '2026-10-13'
+                entrada: Ensalada de aguacate
+                plato_principal: Lentejas con arroz integral
+                bebida: Jugo de mora
+                postre: Fruta natural
+                activo: 1
+                creado_por: 1
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+  /api/menu/{id}:
+    put:
+      tags:
+      - Menú
+      summary: Editar menú
+      description: Actualiza los campos enviados de un menú existente.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Identificador del menú (id_menu).
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: []
+              properties:
+                entrada:
+                  type: string
+                plato_principal:
+                  type: string
+                bebida:
+                  type: string
+                postre:
+                  type: string
+                activo:
+                  type: integer
+                  enum:
+                  - 0
+                  - 1
+            example:
+              plato_principal: Pollo al horno con arroz
+      responses:
+        '200':
+          description: Menú actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Menu'
+              example:
+                id_menu: 7
+                fecha: '2026-10-13'
+                entrada: Ensalada de aguacate
+                plato_principal: Lentejas con arroz integral
+                bebida: Jugo de mora
+                postre: Fruta natural
+                activo: 1
+                creado_por: 1
+        '404':
+          description: El menú no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Menú no encontrado
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+    delete:
+      tags:
+      - Menú
+      summary: Eliminar menú
+      description: Elimina un menú y sus confirmaciones asociadas.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Identificador del menú (id_menu).
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+      responses:
+        '200':
+          description: Menú eliminado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+              example:
+                mensaje: Menú eliminado
+        '404':
+          description: El menú no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Menú no encontrado
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+  /api/confirmacion:
+    post:
+      tags:
+      - Confirmación
+      summary: Confirmar asistencia
+      description: Registra (o reactiva) la confirmación del estudiante autenticado para un menú y le genera una
+        notificación. Solo funciona con un usuario que tenga perfil de estudiante.
+      x-rol: estudiante
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - id_menu
+              properties:
+                id_menu:
+                  type: integer
+                  minimum: 1
+            example:
+              id_menu: 7
+      responses:
+        '200':
+          description: Asistencia confirmada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                  confirmacion:
+                    $ref: '#/components/schemas/Confirmacion'
+              example:
+                mensaje: Asistencia confirmada
+                confirmacion:
+                  id_confirmacion: 12
+                  id_estudiante: 1
+                  id_menu: 7
+                  estado: confirmado
+                  fecha_confirmacion: '2026-10-12T18:20:00.000Z'
+        '400':
+          description: El usuario no es estudiante.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Solo estudiantes pueden confirmar
+        '404':
+          description: El menú no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Menú no encontrado
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/confirmacion/{id_menu}:
+    delete:
+      tags:
+      - Confirmación
+      summary: Cancelar asistencia
+      description: Cambia a "cancelado" la confirmación del estudiante autenticado y genera una notificación. Se
+        puede volver a confirmar después.
+      x-rol: estudiante
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id_menu
+        in: path
+        required: true
+        description: Identificador del menú.
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+      responses:
+        '200':
+          description: Asistencia cancelada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+              example:
+                mensaje: Asistencia cancelada
+        '404':
+          description: El estudiante no había confirmado ese menú.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: No se encontró la confirmación
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/confirmacion/mi-estado/{id_menu}:
+    get:
+      tags:
+      - Confirmación
+      summary: Estado de mi confirmación
+      description: Indica si el estudiante autenticado confirmó, canceló o no ha respondido para un menú.
+      x-rol: estudiante
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id_menu
+        in: path
+        required: true
+        description: Identificador del menú.
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+      responses:
+        '200':
+          description: Estado actual.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estado:
+                    type: string
+                    enum:
+                    - confirmado
+                    - cancelado
+                    - pendiente
+                  confirmacion:
+                    allOf:
+                    - $ref: '#/components/schemas/Confirmacion'
+                    nullable: true
+              example:
+                estado: confirmado
+                confirmacion:
+                  id_confirmacion: 12
+                  id_estudiante: 1
+                  id_menu: 7
+                  estado: confirmado
+                  fecha_confirmacion: '2026-10-12T18:20:00.000Z'
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/confirmacion/historial:
+    get:
+      tags:
+      - Confirmación
+      summary: Mi historial
+      description: Últimas 30 confirmaciones del estudiante autenticado, de la más reciente a la más antigua, con
+        datos del menú.
+      x-rol: estudiante
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Historial.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                  - $ref: '#/components/schemas/Confirmacion'
+                  - type: object
+                    properties:
+                      Menu:
+                        $ref: '#/components/schemas/Menu'
+              example:
+              - id_confirmacion: 12
+                id_estudiante: 1
+                id_menu: 7
+                estado: confirmado
+                fecha_confirmacion: '2026-10-12T18:20:00.000Z'
+                Menu:
+                  fecha: '2026-10-13'
+                  plato_principal: Lentejas con arroz integral
+                  entrada: Ensalada de aguacate
+                  bebida: Jugo de mora
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/confirmacion/conteo/{id_menu}:
+    get:
+      tags:
+      - Confirmación
+      summary: Conteo de confirmaciones de un menú
+      description: Cuenta confirmados, cancelados y pendientes (total de estudiantes menos confirmados y cancelados).
+        Alimenta la barra de progreso.
+      x-rol: estudiante o admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id_menu
+        in: path
+        required: true
+        description: Identificador del menú.
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+      responses:
+        '200':
+          description: Conteo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  confirmados:
+                    type: integer
+                  cancelados:
+                    type: integer
+                  pendientes:
+                    type: integer
+                  total:
+                    type: integer
+              example:
+                confirmados: 87
+                cancelados: 3
+                pendientes: 10
+                total: 100
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/confirmacion/todas:
+    get:
+      tags:
+      - Confirmación
+      summary: Todas las confirmaciones de una fecha
+      description: Lista las confirmaciones del menú de la fecha indicada (por defecto, mañana) con nombre y correo
+        del estudiante. Si no hay menú ese día devuelve una lista vacía.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: fecha
+        in: query
+        required: false
+        description: Fecha del menú (AAAA-MM-DD). Por defecto, mañana.
+        schema:
+          type: string
+          format: date
+        example: '2026-10-13'
+      responses:
+        '200':
+          description: Confirmaciones de la fecha.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                  - $ref: '#/components/schemas/Confirmacion'
+                  - type: object
+                    properties:
+                      Estudiante:
+                        type: object
+                        properties:
+                          curso:
+                            type: string
+                          usuario:
+                            type: object
+                            properties:
+                              nombre:
+                                type: string
+                              correo:
+                                type: string
+              example: []
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+  /api/usuarios:
+    get:
+      tags:
+      - Usuarios
+      summary: Listar usuarios
+      description: Lista todos los usuarios con su perfil de estudiante. Nunca incluye la contraseña.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de usuarios.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Usuario'
+              example:
+              - id_usuario: 2
+                nombre: Sofía Martínez
+                correo: estudiante1@smartfood.co
+                rol: estudiante
+                activo: 1
+                fecha_registro: '2026-06-19T10:00:00.000Z'
+                perfil:
+                  id_estudiante: 1
+                  id_usuario: 2
+                  curso: 11°A
+                  ciudad: San Juan de Nepomuceno
+                  alergias: Ninguna
+                  preferencias: ninguna
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+    post:
+      tags:
+      - Usuarios
+      summary: Crear usuario
+      description: Crea una cuenta. Si el rol no es "admin" también crea su perfil de estudiante con valores por
+        defecto (curso 9°A, ciudad San Juan de Nepomuceno, alergias "Ninguna"). No existe registro público.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - nombre
+              - correo
+              - password
+              properties:
+                nombre:
+                  type: string
+                correo:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                rol:
+                  type: string
+                  enum:
+                  - estudiante
+                  - admin
+                  default: estudiante
+                curso:
+                  type: string
+                ciudad:
+                  type: string
+                alergias:
+                  type: string
+                preferencias:
+                  type: string
+                  enum:
+                  - ninguna
+                  - vegetariano
+                  - vegano
+                  - sin-gluten
+            example:
+              nombre: Pedro Gómez
+              correo: pedro@smartfood.co
+              password: est123
+              rol: estudiante
+              curso: 10°A
+      responses:
+        '201':
+          description: Usuario creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                  id:
+                    type: integer
+              example:
+                mensaje: Usuario creado
+                id: 21
+        '400':
+          description: Faltan datos obligatorios o el correo ya existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: El correo ya existe
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+  /api/usuarios/perfil:
+    get:
+      tags:
+      - Usuarios
+      summary: Ver mi perfil
+      description: Devuelve los datos del usuario autenticado (sin contraseña).
+      x-rol: estudiante o admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Perfil del usuario.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+              example:
+                id_usuario: 2
+                nombre: Sofía Martínez
+                correo: estudiante1@smartfood.co
+                rol: estudiante
+                activo: 1
+                fecha_registro: '2026-06-19T10:00:00.000Z'
+                perfil:
+                  id_estudiante: 1
+                  id_usuario: 2
+                  curso: 11°A
+                  ciudad: San Juan de Nepomuceno
+                  alergias: Ninguna
+                  preferencias: ninguna
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+    put:
+      tags:
+      - Usuarios
+      summary: Actualizar mi perfil
+      description: Actualiza el nombre del usuario y, si es estudiante, su curso, ciudad, alergias y preferencias.
+      x-rol: estudiante o admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: []
+              properties:
+                nombre:
+                  type: string
+                curso:
+                  type: string
+                ciudad:
+                  type: string
+                alergias:
+                  type: string
+                preferencias:
+                  type: string
+                  enum:
+                  - ninguna
+                  - vegetariano
+                  - vegano
+                  - sin-gluten
+            example:
+              nombre: Sofía Martínez
+              alergias: Lactosa
+              preferencias: vegetariano
+      responses:
+        '200':
+          description: Perfil actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+              example:
+                mensaje: Perfil actualizado exitosamente
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/usuarios/cambiar-password:
+    put:
+      tags:
+      - Usuarios
+      summary: Cambiar mi contraseña
+      description: Cambia la contraseña del usuario autenticado. Exige la contraseña actual y que la nueva tenga
+        mínimo 6 caracteres. Se almacena con hash bcrypt.
+      x-rol: estudiante o admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - password_actual
+              - password_nuevo
+              properties:
+                password_actual:
+                  type: string
+                password_nuevo:
+                  type: string
+                  minLength: 6
+            example:
+              password_actual: est123
+              password_nuevo: NuevaClave2026
+      responses:
+        '200':
+          description: Contraseña actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+              example:
+                mensaje: Contraseña actualizada exitosamente
+        '400':
+          description: Nueva contraseña muy corta o contraseña actual incorrecta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Contraseña actual incorrecta
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/usuarios/{id}:
+    put:
+      tags:
+      - Usuarios
+      summary: Editar usuario
+      description: Actualiza nombre, correo, rol y estado (activo) de un usuario y, si es estudiante, los datos
+        de su perfil. No cambia la contraseña.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Identificador del usuario (id_usuario).
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: []
+              properties:
+                nombre:
+                  type: string
+                correo:
+                  type: string
+                  format: email
+                rol:
+                  type: string
+                  enum:
+                  - estudiante
+                  - admin
+                activo:
+                  type: integer
+                  enum:
+                  - 0
+                  - 1
+                curso:
+                  type: string
+                ciudad:
+                  type: string
+                alergias:
+                  type: string
+                preferencias:
+                  type: string
+            example:
+              nombre: Pedro Gómez
+              correo: pedro@smartfood.co
+              rol: estudiante
+              activo: 1
+              curso: 11°A
+      responses:
+        '200':
+          description: Usuario actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+              example:
+                mensaje: Usuario actualizado
+        '404':
+          description: El usuario no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Usuario no encontrado
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+    delete:
+      tags:
+      - Usuarios
+      summary: Eliminar usuario
+      description: Elimina un usuario y, en cascada, su perfil, confirmaciones y notificaciones. Un administrador
+        no puede eliminarse a sí mismo.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Identificador del usuario (id_usuario).
+        schema:
+          type: integer
+          minimum: 1
+        example: 1
+      responses:
+        '200':
+          description: Usuario eliminado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+              example:
+                mensaje: Usuario eliminado
+        '400':
+          description: Intento de eliminarse a sí mismo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: No puedes eliminar tu propio usuario
+        '404':
+          description: El usuario no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Usuario no encontrado
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+  /api/notificaciones:
+    get:
+      tags:
+      - Notificaciones
+      summary: Mis notificaciones
+      description: Últimas 30 notificaciones del usuario autenticado, de la más reciente a la más antigua.
+      x-rol: estudiante o admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de notificaciones.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notificacion'
+              example:
+              - id_notificacion: 5
+                id_usuario: 2
+                titulo: Asistencia confirmada
+                mensaje: Tu asistencia al comedor del 2026-10-13 fue registrada exitosamente.
+                tipo: confirmacion
+                leida: 0
+                fecha: '2026-10-12T18:20:00.000Z'
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/notificaciones/no-leidas:
+    get:
+      tags:
+      - Notificaciones
+      summary: Contar no leídas
+      description: Número de notificaciones sin leer del usuario autenticado (para el distintivo del menú).
+      x-rol: estudiante o admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Conteo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+              example:
+                count: 3
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/notificaciones/marcar-leidas:
+    put:
+      tags:
+      - Notificaciones
+      summary: Marcar todas como leídas
+      description: Marca como leídas todas las notificaciones pendientes del usuario autenticado. No recibe cuerpo.
+      x-rol: estudiante o admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Notificaciones actualizadas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+              example:
+                mensaje: Notificaciones marcadas como leídas
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token inválido o expirado
+  /api/notificaciones/masiva:
+    post:
+      tags:
+      - Notificaciones
+      summary: Enviar notificación masiva
+      description: Crea una notificación para todos los estudiantes activos (por defecto) o para todos los usuarios
+        activos si `destinatarios` es "todos".
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - titulo
+              - mensaje
+              properties:
+                titulo:
+                  type: string
+                  maxLength: 120
+                mensaje:
+                  type: string
+                tipo:
+                  type: string
+                  enum:
+                  - menu
+                  - confirmacion
+                  - recordatorio
+                  - cancelacion
+                  - sistema
+                  default: sistema
+                destinatarios:
+                  type: string
+                  enum:
+                  - estudiantes
+                  - todos
+                  default: estudiantes
+            example:
+              titulo: Cambio de menú
+              mensaje: Mañana el almuerzo se servirá a las 12:30.
+              tipo: sistema
+              destinatarios: estudiantes
+      responses:
+        '200':
+          description: Notificación enviada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensaje'
+              example:
+                mensaje: Notificación enviada a 10 usuarios
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+  /api/reportes/estadisticas:
+    get:
+      tags:
+      - Reportes
+      summary: Estadísticas generales
+      description: Calcula, para el menú de mañana, los confirmados, cancelados, pendientes y el porcentaje de asistencia,
+        más los confirmados por día (últimos 7 días) y por curso.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Estadísticas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estadisticas'
+              example:
+                totalEstudiantes: 10
+                confirmadosHoy: 7
+                canceladosHoy: 1
+                pendientesHoy: 2
+                porcentajeAsistencia: 70
+                porDia:
+                - fecha: '2026-10-12'
+                  confirmados: 8
+                porCurso:
+                - curso: 11°A
+                  confirmados: 3
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+  /api/reportes/semanal:
+    get:
+      tags:
+      - Reportes
+      summary: Resumen semanal
+      description: Confirmados y cancelados por día de la semana actual (lunes a viernes) con el plato principal.
+      x-rol: admin
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Resumen semanal.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    fecha:
+                      type: string
+                      format: date
+                    plato_principal:
+                      type: string
+                    confirmados:
+                      type: string
+                    cancelados:
+                      type: string
+              example:
+              - fecha: '2026-10-12'
+                plato_principal: Lentejas con arroz integral
+                confirmados: '8'
+                cancelados: '1'
+        '500':
+          description: Error interno del servidor o de la base de datos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: mensaje técnico del error
+        '401':
+          description: Falta el token (encabezado Authorization).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Token requerido
+        '403':
+          description: Token inválido/expirado, o el usuario no es administrador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Acceso restringido a administradores
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token obtenido en POST /api/auth/login
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+    ErrorValidacion:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              msg:
+                type: string
+              path:
+                type: string
+              location:
+                type: string
+    Mensaje:
+      type: object
+      properties:
+        mensaje:
+          type: string
+    Menu:
+      type: object
+      properties:
+        id_menu:
+          type: integer
+        fecha:
+          type: string
+          format: date
+        entrada:
+          type: string
+        plato_principal:
+          type: string
+        bebida:
+          type: string
+        postre:
+          type: string
+        activo:
+          type: integer
+          enum:
+          - 0
+          - 1
+        creado_por:
+          type: integer
+    Estudiante:
+      type: object
+      properties:
+        id_estudiante:
+          type: integer
+        id_usuario:
+          type: integer
+        curso:
+          type: string
+        ciudad:
+          type: string
+        alergias:
+          type: string
+        preferencias:
+          type: string
+          enum:
+          - ninguna
+          - vegetariano
+          - vegano
+          - sin-gluten
+    Usuario:
+      type: object
+      properties:
+        id_usuario:
+          type: integer
+        nombre:
+          type: string
+        correo:
+          type: string
+          format: email
+        rol:
+          type: string
+          enum:
+          - admin
+          - estudiante
+        activo:
+          type: integer
+          enum:
+          - 0
+          - 1
+        fecha_registro:
+          type: string
+          format: date-time
+        perfil:
+          allOf:
+          - $ref: '#/components/schemas/Estudiante'
+          nullable: true
+    UsuarioSesion:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        correo:
+          type: string
+        rol:
+          type: string
+          enum:
+          - admin
+          - estudiante
+        perfil:
+          allOf:
+          - $ref: '#/components/schemas/Estudiante'
+          nullable: true
+    Confirmacion:
+      type: object
+      properties:
+        id_confirmacion:
+          type: integer
+        id_estudiante:
+          type: integer
+        id_menu:
+          type: integer
+        estado:
+          type: string
+          enum:
+          - confirmado
+          - cancelado
+        fecha_confirmacion:
+          type: string
+          format: date-time
+    Notificacion:
+      type: object
+      properties:
+        id_notificacion:
+          type: integer
+        id_usuario:
+          type: integer
+        titulo:
+          type: string
+        mensaje:
+          type: string
+        tipo:
+          type: string
+          enum:
+          - menu
+          - confirmacion
+          - recordatorio
+          - cancelacion
+          - sistema
+        leida:
+          type: integer
+          enum:
+          - 0
+          - 1
+        fecha:
+          type: string
+          format: date-time
+    Estadisticas:
+      type: object
+      properties:
+        totalEstudiantes:
+          type: integer
+        confirmadosHoy:
+          type: integer
+        canceladosHoy:
+          type: integer
+        pendientesHoy:
+          type: integer
+        porcentajeAsistencia:
+          type: number
+        porDia:
+          type: array
+          items:
+            type: object
+            properties:
+              fecha:
+                type: string
+              confirmados:
+                type: integer
+        porCurso:
+          type: array
+          items:
+            type: object
+            properties:
+              curso:
+                type: string
+              confirmados:
+                type: integer

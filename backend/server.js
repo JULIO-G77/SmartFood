@@ -30,6 +30,7 @@ app.use('/api/confirmacion',   require('./routes/confirmacion'));
 app.use('/api/usuarios',       require('./routes/usuarios'));
 app.use('/api/notificaciones', require('./routes/notificaciones'));
 app.use('/api/reportes',       require('./routes/reportes'));
+app.use('/api/docs',           require('./routes/docs'));   // Swagger UI
 
 // Ruta de salud
 app.get('/api/salud', (req, res) => res.json({ estado: 'OK', sistema: 'SmartFood', version: '1.0.0' }));

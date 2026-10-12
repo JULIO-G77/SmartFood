@@ -49,3 +49,10 @@ Ver `docs/INSTALACION.md`
 |-----|--------|-----------|
 | Admin | admin@smartfood.co | admin123 |
 | Estudiante | maria@smartfood.co | est123 |
+
+## Documentación de la API
+
+- Documentación interactiva (Swagger UI): `/api/docs` (local: http://localhost:3000/api/docs)
+- Especificación OpenAPI 3.0: `backend/docs/openapi.yaml` (también en JSON: `/api/docs/openapi.json`)
+- Guía de cada servicio con entradas y salidas: `docs/api/API.md`
+- Ejemplos listos para probar en VS Code: `docs/api/ejemplos.http`
