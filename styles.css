@@ -1,0 +1,28 @@
+import { fechaLarga } from '../utils/formato.js';
+
+/**
+ * Tarjeta con los cuatro platos de un menú diario.
+ * @param {{menu: object, titulo: string, soloLectura?: boolean}} props
+ *   menu: objeto con fecha, entrada, plato_principal, bebida y postre (respuesta de la API).
+ */
+export default function TarjetaMenu({ menu, titulo, soloLectura = false }) {
+  const filas = [
+    ['Entrada', menu.entrada],
+    ['Plato principal', menu.plato_principal],
+    ['Bebida', menu.bebida],
+    ['Postre', menu.postre]
+  ];
+  return (
+    <article className={`tarjeta ${soloLectura ? 'tarjeta-gris' : ''}`}>
+      <h3>{titulo} <span className="fecha">{fechaLarga(menu.fecha)}</span></h3>
+      <dl className="platos">
+        {filas.map(([nombre, valor]) => (
+          <div key={nombre} className="plato">
+            <dt>{nombre}</dt>
+            <dd>{valor}</dd>
+          </div>
+        ))}
+      </dl>
+    </article>
+  );
+}

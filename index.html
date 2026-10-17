@@ -1,0 +1,81 @@
+/**
+ * Cliente de la API REST de SmartFood.
+ * Centraliza fetch, el encabezado Authorization (token JWT) y el manejo de errores,
+ * para que los componentes no repitan esa lógica.
+ */
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
+const CLAVE_TOKEN = 'sf_token';
+const CLAVE_USUARIO = 'sf_usuario';
+
+/** Guarda la sesión (token y datos del usuario) en el navegador. */
+export function guardarSesion(token, usuario) {
+  localStorage.setItem(CLAVE_TOKEN, token);
+  localStorage.setItem(CLAVE_USUARIO, JSON.stringify(usuario));
+}
+
+/** Borra la sesión del navegador (cerrar sesión). */
+export function borrarSesion() {
+  localStorage.removeItem(CLAVE_TOKEN);
+  localStorage.removeItem(CLAVE_USUARIO);
+}
+
+/** @returns {object|null} Usuario guardado en la sesión, o null si no hay sesión. */
+export function leerUsuario() {
+  try {
+    return JSON.parse(localStorage.getItem(CLAVE_USUARIO));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Hace una petición a la API y devuelve el JSON de la respuesta.
+ * @param {string} metodo - GET, POST, PUT o DELETE.
+ * @param {string} ruta - Ruta relativa, por ejemplo '/menu'.
+ * @param {object} [cuerpo] - Datos a enviar en formato JSON.
+ * @throws {Error} Con el mensaje que devuelve la API (campo "error") y la propiedad status.
+ */
+async function peticion(metodo, ruta, cuerpo) {
+  const token = localStorage.getItem(CLAVE_TOKEN);
+  const respuesta = await fetch(`${BASE_URL}${ruta}`, {
+    method: metodo,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined
+  });
+  const datos = await respuesta.json().catch(() => ({}));
+  if (!respuesta.ok) {
+    const error = new Error(datos.error || 'No se pudo conectar con el servidor');
+    error.status = respuesta.status;
+    throw error;
+  }
+  return datos;
+}
+
+/** Servicios de la API que usa el módulo del estudiante. */
+export const Api = {
+  // Autenticación
+  login: (correo, password) => peticion('POST', '/auth/login', { correo, password }),
+  // Menú
+  menuHoy: () => peticion('GET', '/menu/hoy'),
+  menuManana: () => peticion('GET', '/menu'),
+  menuSemana: () => peticion('GET', '/menu/semana'),
+  // Confirmación de asistencia
+  estadoConfirmacion: (idMenu) => peticion('GET', `/confirmacion/mi-estado/${idMenu}`),
+  conteo: (idMenu) => peticion('GET', `/confirmacion/conteo/${idMenu}`),
+  confirmar: (idMenu) => peticion('POST', '/confirmacion', { id_menu: idMenu }),
+  cancelar: (idMenu) => peticion('DELETE', `/confirmacion/${idMenu}`),
+  historial: () => peticion('GET', '/confirmacion/historial'),
+  // Notificaciones
+  notificaciones: () => peticion('GET', '/notificaciones'),
+  noLeidas: () => peticion('GET', '/notificaciones/no-leidas'),
+  marcarLeidas: () => peticion('PUT', '/notificaciones/marcar-leidas'),
+  // Perfil
+  perfil: () => peticion('GET', '/usuarios/perfil'),
+  actualizarPerfil: (datos) => peticion('PUT', '/usuarios/perfil', datos),
+  cambiarPassword: (actual, nueva) =>
+    peticion('PUT', '/usuarios/cambiar-password', { password_actual: actual, password_nuevo: nueva })
+};
